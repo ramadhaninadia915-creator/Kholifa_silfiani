@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="id"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sistem Informasi Apotek</title>
+<style>
+:root{--bg:#EFF5F2;--cd:#fff;--tx:#10231C;--mu:#587067;--ln:#D3E0DA;--pr:#047857;--pt:#fff;--ok:#15803D;--wn:#B45309;--bd:#B91C1C;--hd:#0B3D2E;--ht:#F1F8F5;--ac:#F59E0B;color-scheme:light}
+@media(prefers-color-scheme:dark){:root{--bg:#0B1612;--cd:#122620;--tx:#E5F1EC;--mu:#93ADA3;--ln:#223A32;--pr:#34D399;--pt:#052018;--ok:#4ADE80;--wn:#FBBF24;--bd:#F87171;--hd:#08261D;color-scheme:dark}}
+*,::before,::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.5 "Avenir Next","Segoe UI",system-ui,sans-serif}
+header{position:sticky;top:0;z-index:11;background:var(--hd);color:var(--ht);padding:10px 16px;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center}
+header b{font-size:17px}.sg{display:flex;gap:4px;flex-wrap:wrap}
+.hb{background:transparent;color:var(--ht);border:1px solid #ffffff44;padding:6px 12px}.hb.on{background:var(--ac);border-color:var(--ac);color:#1B1400;font-weight:600}
+main{max-width:1100px;margin:0 auto;padding:16px}h3{margin:18px 0 8px;font-size:15px}
+button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--ln);background:var(--cd);color:var(--tx);padding:8px 12px}
+button:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--pr);outline-offset:2px}
+.p{background:var(--pr);border-color:var(--pr);color:var(--pt);font-weight:600}.d{color:var(--bd);border-color:var(--bd)}
+input,select{font:inherit;padding:8px 10px;border:1px solid var(--ln);border-radius:8px;background:var(--cd);color:var(--tx);min-width:0}
+.c{background:var(--cd);border:1px solid var(--ln);border-radius:12px;padding:14px}
+.g{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}.g2{display:grid;gap:12px;grid-template-columns:repeat(auto-fill,minmax(320px,1fr))}
+.big{font-size:22px;font-weight:700}.mu{color:var(--mu)}small{font-size:12px}
+.r{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}.r input,.r select{flex:1 1 140px}
+.sp{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.chip{font-size:12px;font-weight:600;padding:2px 10px;border-radius:99px;background:color-mix(in srgb,currentColor 14%,transparent)}
+.sv{border-left:4px solid var(--k)}
+.tk{display:flex;gap:3px;margin:8px 0 2px}.tk i{flex:1;height:5px;border-radius:3px;background:var(--ln)}.tk i.on{background:var(--pr)}
+.wr{background:color-mix(in srgb,var(--wn) 14%,transparent);border:1px solid var(--wn);border-radius:8px;padding:6px 10px;margin:8px 0;font-size:13px}
+.w{overflow-x:auto}table{border-collapse:collapse;width:100%;min-width:640px}th,td{text-align:left;padding:8px;border-bottom:1px solid var(--ln)}
+details{margin-top:8px}summary{cursor:pointer;color:var(--mu)}ul,ol{margin:6px 0 0;padding-left:18px}
+hr{border:0;border-top:1px dashed var(--ln);margin:10px 0}
+.ov{position:fixed;inset:0;background:#0008;display:flex;align-items:center;justify-content:center;padding:16px;z-index:20}
+.ov>div{background:var(--cd);border-radius:12px;padding:20px;max-width:360px;width:100%;max-height:90vh;overflow:auto}
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--hd);color:var(--ht);padding:10px 16px;border-radius:8px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:30;max-width:90vw}#toast.show{opacity:1}
+</style></head><body>
+<header><b>Apotek Sehat</b><div class="sg" id="role"></div><nav class="sg" id="nav"></nav></header>
+<main id="app"></main><div id="mod"></div><div id="toast"></div>
+<script>
+(()=>{
+const $=s=>document.querySelector(s);
+const fmt=n=>'Rp '+Math.round(Number(n)||0).toLocaleString('id-ID');
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const now=()=>new Date().toLocaleString('id-ID',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+const pad=(n,l=4)=>String(n).padStart(l,'0');
+const KEY='apotek_v1';
+const ST=['Input','Cek stok','Verifikasi','Racik','Kemas','Invoice','Bayar','Serah','Selesai'];
+const IDX={'Verifikasi Apoteker':2,'Racik':3,'Kemas':4,'Menunggu Invoice':5,'Menunggu Pembayaran':6,'Siap Diserahkan':7,'Selesai':8};
+const NEED={'Verifikasi Apoteker':'Apoteker','Racik':'Apoteker','Kemas':'Apoteker','Menunggu Invoice':'Kasir','Menunggu Pembayaran':'Kasir','Siap Diserahkan':'Apoteker'};
+const COL={'Verifikasi Apoteker':'var(--wn)','Racik':'var(--pr)','Kemas':'var(--pr)','Menunggu Invoice':'var(--wn)','Menunggu Pembayaran':'var(--wn)','Siap Diserahkan':'var(--ok)','Selesai':'var(--mu)','Batal (Stok Kosong)':'var(--bd)','Resep Ditolak':'var(--bd)','Habis':'var(--bd)','Menipis':'var(--wn)','Tersedia':'var(--ok)','Segera ED':'var(--wn)','Kedaluwarsa':'var(--bd)'};
+const MET=['Tunai','QRIS','Transfer','Debit'];
+const INTER=[['O5','O6','risiko iritasi dan perdarahan lambung meningkat'],['O5','O7','risiko perdarahan meningkat'],['O6','O7','risiko perdarahan meningkat'],['O6','O8','risiko perdarahan meningkat'],['O4','O8','omeprazole dapat menurunkan efek clopidogrel']];
+const seed=()=>({seq:{t:4,i:3,o:11},
+obat:[['O1','Paracetamol 500 mg (strip)','Bebas',6000,80,20,'2027-08'],['O2','Amoxicillin 500 mg (strip)','Keras',18000,30,10,'2027-03'],['O3','Cetirizine 10 mg (strip)','Bebas',9000,40,10,'2027-05'],['O4','Omeprazole 20 mg (strip)','Keras',22000,8,10,'2026-12'],['O5','Ibuprofen 400 mg (strip)','Bebas',12000,25,10,'2027-01'],['O6','Aspirin 80 mg (strip)','Bebas',7000,15,10,'2027-06'],['O7','Warfarin 2 mg (strip)','Keras',15000,0,5,'2027-02'],['O8','Clopidogrel 75 mg (strip)','Keras',45000,12,5,'2027-02'],['O9','Metformin 500 mg (strip)','Keras',11000,35,10,'2027-09'],['O10','Vitamin C 500 mg (botol)','Bebas',25000,18,5,'2028-01']].map(a=>({id:a[0],nama:a[1],gol:a[2],harga:a[3],stok:a[4],min:a[5],ed:a[6]})),
+trx:[
+{id:'TRX-0001',pasien:'Lia S.',hp:'0812-5000-0001',dokter:'dr. Hadi',jenis:'Resep dokter',items:[{oid:'O2',nama:'Amoxicillin 500 mg (strip)',q:1,harga:18000},{oid:'O3',nama:'Cetirizine 10 mg (strip)',q:1,harga:9000}],status:'Selesai',warn:[],inv:'INV-A0001',tgl:'Hari ini',metode:'Tunai',dibayar:30000,kembali:3000,log:['Pasien datang menyerahkan resep; Kasir menginput data','Apoteker: resep valid, obat diracik dan dikemas','Kasir membuat invoice; pembayaran diterima, struk dicetak','Apoteker menyerahkan obat dan memberi konseling']},
+{id:'TRX-0002',pasien:'Joko M.',hp:'0812-5000-0002',dokter:'-',jenis:'Tanpa resep',items:[{oid:'O1',nama:'Paracetamol 500 mg (strip)',q:2,harga:6000},{oid:'O10',nama:'Vitamin C 500 mg (botol)',q:1,harga:25000}],status:'Menunggu Pembayaran',warn:[],inv:'INV-A0002',log:['Pasien datang menyebutkan obat; Kasir menginput data','Apoteker: resep valid, obat diracik dan dikemas','Kasir membuat invoice INV-A0002']},
+{id:'TRX-0003',pasien:'Rina A.',hp:'0812-5000-0003',dokter:'dr. Sari',jenis:'Resep dokter',items:[{oid:'O5',nama:'Ibuprofen 400 mg (strip)',q:1,harga:12000},{oid:'O6',nama:'Aspirin 80 mg (strip)',q:1,harga:7000}],status:'Verifikasi Apoteker',warn:['Interaksi: Ibuprofen 400 mg (strip) + Aspirin 80 mg (strip): risiko iritasi dan perdarahan lambung meningkat'],log:['Pasien datang menyerahkan resep; Kasir menginput data','Sistem: validasi dan cek stok, stok tersedia. Menunggu verifikasi apoteker']}]});
+let S=null;try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
+if(!S||!S.obat)S=seed();
+const U={role:'Kasir',tab:'resep'};let draft=[],form={pasien:'',hp:'',dokter:'',jenis:'Resep dokter'};
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const toast=m=>{const t=$('#toast');t.textContent=m;t.className='show';clearTimeout(toast.t);toast.t=setTimeout(()=>{t.className=''},3000)};
+const chip=s=>`<span class="chip" style="color:${COL[s]||'var(--mu)'}">${s}</span>`;
+const O=id=>S.obat.find(o=>o.id===id),T=id=>S.trx.find(t=>t.id===id);
+const total=t=>t.items.reduce((s,i)=>s+i.q*i.harga,0);
+const lg=(t,x)=>t.log.push(now()+' — '+x);
+const warns=(items,jenis)=>{const w=[],ids=items.map(i=>i.oid);INTER.forEach(a=>{if(ids.includes(a[0])&&ids.includes(a[1]))w.push('Interaksi: '+O(a[0]).nama+' + '+O(a[1]).nama+': '+a[2])});if(jenis==='Tanpa resep')items.forEach(i=>{if(O(i.oid).gol==='Keras')w.push('Obat keras tanpa resep: '+i.nama)});return w};
+function tCard(t){
+  const n=NEED[t.status],can=n===U.role,i=IDX[t.status],id=t.id;let a='';
+  if(can){
+    if(t.status==='Verifikasi Apoteker')a=`<div class="r"><input id="r-${id}" placeholder="Alasan (jika ditolak)"><button class="p" data-a="valid" data-id="${id}">Resep valid</button><button class="d" data-a="tolak" data-id="${id}">Tolak resep</button></div>`;
+    else if(t.status==='Racik')a=`<div class="r"><button class="p" data-a="racik" data-id="${id}">Obat selesai disiapkan dan diracik</button></div>`;
+    else if(t.status==='Kemas')a=`<div class="r"><button class="p" data-a="kemas" data-id="${id}">Etiket terpasang, obat dikemas</button></div>`;
+    else if(t.status==='Menunggu Invoice')a=`<div class="r"><button class="p" data-a="inv" data-id="${id}">Hitung total dan buat invoice</button></div>`;
+    else if(t.status==='Menunggu Pembayaran')a=`<div class="r"><select id="m-${id}">${MET.map(m=>`<option>${m}</option>`).join('')}</select><input id="d-${id}" type="number" min="0" placeholder="Uang dibayar (Tunai)"><button class="p" data-a="pay" data-id="${id}">Terima bayar, cetak struk</button></div>`;
+    else if(t.status==='Siap Diserahkan')a=`<div class="r"><button class="p" data-a="serah" data-id="${id}">Serahkan obat dan beri konseling</button></div>`;
+  }else if(n)a=`<small class="mu">Menunggu tindakan ${n}</small>`;
+  if(t.inv&&t.dibayar!=null)a+=`<div class="r"><button data-a="struk" data-id="${id}">Lihat struk</button></div>`;
+  const tk=i==null?'':`<div class="tk">${ST.map((s,k)=>`<i class="${k<=i?'on':''}"></i>`).join('')}</div><small class="mu">Tahap ${i+1} dari 9: ${ST[i]}</small>`;
+  return `<div class="c sv" style="--k:${COL[t.status]}"><div class="sp"><b>${id}</b>${chip(t.status)}</div><div>${esc(t.pasien)} · ${esc(t.hp)}</div><small class="mu">${esc(t.jenis)}${t.dokter!=='-'?' · '+esc(t.dokter):''}</small><ul>${t.items.map(x=>`<li>${esc(x.nama)} ×${x.q}</li>`).join('')}</ul>${t.warn.length?`<div class="wr">${t.warn.map(esc).join('<br>')}</div>`:''}${t.inv?`<div>${t.inv} · <b>${fmt(total(t))}</b></div>`:''}${tk}${a}<details><summary>Riwayat proses</summary><ul>${t.log.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></details></div>`;
+}
+function rsView(){
+  const f=form,form_=U.role==='Kasir'?`<div class="c"><b>Resep atau permintaan obat baru</b><div class="r"><input data-f="pasien" value="${esc(f.pasien)}" placeholder="Nama pasien"><input data-f="hp" value="${esc(f.hp)}" placeholder="No. HP"><input data-f="dokter" value="${esc(f.dokter)}" placeholder="Nama dokter (jika ada)"><select data-f="jenis"><option${f.jenis==='Resep dokter'?' selected':''}>Resep dokter</option><option${f.jenis==='Tanpa resep'?' selected':''}>Tanpa resep</option></select></div><div class="r"><select id="so">${S.obat.map(o=>`<option value="${o.id}">${esc(o.nama)} (stok ${o.stok})</option>`).join('')}</select><input id="sq" type="number" min="1" value="1" style="flex:0 1 80px"><button data-a="dadd">Tambah obat</button></div>${draft.length?`<ul>${draft.map((x,k)=>`<li>${esc(x.nama)} ×${x.q} <button data-a="ddel" data-id="${k}">hapus</button></li>`).join('')}</ul>`:''}<div class="r"><button class="p" data-a="new">Proses resep</button></div></div>`:`<div class="c mu">Penerimaan resep baru dilakukan oleh peran Kasir.</div>`;
+  return `<h3>Pelayanan resep</h3>${form_}<h3>Daftar transaksi</h3><div class="g2">${[...S.trx].reverse().map(tCard).join('')}</div><details class="c"><summary>Alur proses (sesuai diagram BPMN)</summary><ol><li>Pasien datang menyerahkan resep atau menyebutkan obat; Kasir menginput data pasien dan resep.</li><li>Sistem memvalidasi resep dan mengecek stok. Stok kosong: transaksi batal.</li><li>Apoteker mengecek interaksi obat dan memverifikasi resep. Tidak valid: resep ditolak.</li><li>Apoteker meracik, memberi etiket, dan mengemas obat.</li><li>Kasir menghitung total dan membuat invoice; pasien membayar; Kasir menerima pembayaran dan mencetak struk.</li><li>Sistem memperbarui stok dan mencatat transaksi; Apoteker menyerahkan obat dan memberi konseling; transaksi selesai.</li></ol></details>`;
+}
+const edS=o=>{const d=(new Date(o.ed+'-01')-Date.now())/864e5;return d<0?'Kedaluwarsa':d<90?'Segera ED':''};
+function stView(){
+  return `<h3>Stok obat</h3><div class="c w"><table><tr><th>Kode<th>Obat<th>Golongan<th>Harga<th>Stok<th>Min<th>ED<th>Status<th>Tambah</tr>${S.obat.map(o=>{const s=o.stok<1?'Habis':o.stok<=o.min?'Menipis':'Tersedia',e=edS(o);return `<tr><td>${o.id}<td>${esc(o.nama)}<td>${o.gol}<td>${fmt(o.harga)}<td>${o.stok}<td>${o.min}<td>${o.ed} ${e?chip(e):''}<td>${chip(s)}<td><button data-a="rs" data-id="${o.id}:10">+10</button> <button data-a="rs" data-id="${o.id}:50">+50</button>`}).join('')}</table></div><h3>Obat baru</h3><div class="c"><div class="r"><input id="on" placeholder="Nama obat (kemasan)"><select id="og"><option>Bebas</option><option>Keras</option></select><input id="oh" type="number" min="0" placeholder="Harga"><input id="os" type="number" min="0" placeholder="Stok awal"><input id="oe" type="month" title="Kedaluwarsa"><button class="p" data-a="addo">Tambah obat</button></div></div>`;
+}
+function rwView(){
+  const p=S.trx.filter(t=>t.inv&&t.dibayar!=null);
+  return `<h3>Riwayat pembayaran</h3><div class="c w"><table><tr><th>Invoice<th>Tanggal<th>Pasien<th>Total<th>Metode<th></tr>${[...p].reverse().map(t=>`<tr><td>${t.inv}<td>${esc(t.tgl)}<td>${esc(t.pasien)}<td>${fmt(total(t))}<td>${t.metode}<td><button data-a="struk" data-id="${t.id}">Struk</button>`).join('')||'<tr><td colspan=6 class="mu">Belum ada pembayaran.'}</table></div>`;
+}
+function render(){
+  $('#role').innerHTML=['Kasir','Apoteker'].map(r=>`<button class="hb${U.role===r?' on':''}" data-a="role" data-id="${r}">${r}</button>`).join('');
+  $('#nav').innerHTML=[['resep','Pelayanan resep'],['stok','Stok obat'],['riwayat','Riwayat']].map(a=>`<button class="hb${U.tab===a[0]?' on':''}" data-a="tab" data-id="${a[0]}">${a[1]}</button>`).join('');
+  const act=S.trx.filter(t=>NEED[t.status]);
+  const cards=[['Transaksi aktif',act.length],['Perlu tindakan '+U.role,act.filter(t=>NEED[t.status]===U.role).length],['Total pendapatan',fmt(S.trx.filter(t=>t.dibayar!=null).reduce((s,t)=>s+total(t),0))],['Obat menipis atau habis',S.obat.filter(o=>o.stok<=o.min).length]];
+  $('#app').innerHTML=`<div class="g">${cards.map(c=>`<div class="c"><small class="mu">${c[0]}</small><div class="big">${c[1]}</div></div>`).join('')}</div>`+(U.tab==='resep'?rsView():U.tab==='stok'?stView():rwView())+`<p><small class="mu">Data obat dan interaksi hanya contoh untuk simulasi, bukan rujukan klinis.</small> <button data-a="reset">Reset data contoh</button></p>`;
+}
+const struk=t=>{$('#mod').innerHTML=`<div class="ov"><div><h3 style="margin:0">Apotek Sehat</h3><small class="mu">${t.inv} · ${esc(t.tgl)} · ${esc(t.pasien)}</small><hr>${t.items.map(i=>`<div class="sp"><span>${esc(i.nama)} ×${i.q}</span><b>${fmt(i.harga*i.q)}</b></div>`).join('')}<hr><div class="sp"><b>Total</b><b class="big">${fmt(total(t))}</b></div><div class="sp"><span>Metode</span><span>${t.metode}</span></div><div class="sp"><span>Dibayar</span><span>${fmt(t.dibayar)}</span></div><div class="sp"><span>Kembali</span><span>${fmt(t.kembali)}</span></div><div class="r"><button class="p" style="flex:1" data-a="close">Tutup</button></div></div></div>`};
+const H={
+  role:id=>{U.role=id},tab:id=>{U.tab=id},close:()=>{$('#mod').innerHTML=''},
+  dadd(){const id=$('#so').value,q=Math.floor(+$('#sq').value);if(!(q>0)){toast('Jumlah minimal 1');return false}
+    const o=O(id),d=draft.find(x=>x.oid===id);if(d)d.q+=q;else draft.push({oid:id,nama:o.nama,q,harga:o.harga})},
+  ddel(k){draft.splice(+k,1)},
+  new(){const f=form;if(!f.pasien.trim()||!draft.length){toast('Isi nama pasien dan tambahkan minimal satu obat');return false}
+    const t={id:'TRX-'+pad(S.seq.t++),pasien:f.pasien.trim(),hp:f.hp.trim()||'-',dokter:f.dokter.trim()||'-',jenis:f.jenis,items:draft.map(i=>({...i})),log:[],warn:[]};
+    lg(t,'Pasien datang menyerahkan resep atau menyebutkan obat; Kasir menginput data pasien dan resep');
+    const k=t.items.filter(i=>O(i.oid).stok<i.q);
+    if(k.length){t.status='Batal (Stok Kosong)';lg(t,'Sistem: stok tidak cukup untuk '+k.map(i=>i.nama).join(', ')+'. Transaksi batal')}
+    else{t.warn=warns(t.items,t.jenis);t.status='Verifikasi Apoteker';lg(t,'Sistem: validasi resep dan cek stok otomatis, stok tersedia. Menunggu verifikasi apoteker')}
+    S.trx.push(t);draft=[];form.pasien=form.hp=form.dokter='';toast(t.id+(k.length?': batal, stok kosong':' dibuat, menunggu apoteker'))},
+  valid(id){const t=T(id);t.status='Racik';lg(t,'Apoteker: interaksi obat dicek, resep valid')},
+  tolak(id){const t=T(id),r=($('#r-'+id).value||'').trim();t.status='Resep Ditolak';lg(t,'Apoteker menolak resep'+(r?': '+r:''))},
+  racik(id){const t=T(id);t.status='Kemas';lg(t,'Apoteker menyiapkan dan meracik obat')},
+  kemas(id){const t=T(id);t.status='Menunggu Invoice';lg(t,'Apoteker memberi etiket dan mengemas obat')},
+  inv(id){const t=T(id);t.inv='INV-A'+pad(S.seq.i++);t.status='Menunggu Pembayaran';lg(t,'Kasir menghitung total '+fmt(total(t))+' dan membuat invoice '+t.inv)},
+  pay(id){const t=T(id),m=$('#m-'+id).value,tot=total(t),d=m==='Tunai'?+$('#d-'+id).value:tot;
+    if(!(d>=tot)){toast('Uang dibayar kurang dari total '+fmt(tot));return false}
+    const k=t.items.filter(i=>O(i.oid).stok<i.q);if(k.length){toast('Stok '+k[0].nama+' tidak cukup');return false}
+    t.items.forEach(i=>{O(i.oid).stok-=i.q});
+    Object.assign(t,{metode:m,dibayar:d,kembali:d-tot,tgl:now(),status:'Siap Diserahkan'});
+    lg(t,'Pasien membayar ('+m+'); Kasir menerima pembayaran dan mencetak struk; Sistem memperbarui stok dan mencatat transaksi');struk(t)},
+  serah(id){const t=T(id);t.status='Selesai';lg(t,'Apoteker menyerahkan obat dan memberi konseling; pasien menerima obat. Transaksi selesai')},
+  struk(id){struk(T(id))},
+  rs(x){const a=x.split(':');O(a[0]).stok+=+a[1]},
+  addo(){const g=i=>$('#'+i).value.trim(),n=g('on'),h=+g('oh');if(!n||!(h>0)){toast('Isi nama obat dan harga');return false}
+    S.obat.push({id:'O'+S.seq.o++,nama:n,gol:g('og'),harga:h,stok:+g('os')||0,min:10,ed:g('oe')||'2028-01'});toast('Obat ditambahkan')},
+  reset(){if(!H.reset.c){H.reset.c=1;toast('Tekan Reset sekali lagi untuk konfirmasi');setTimeout(()=>{H.reset.c=0},3000);return false}
+    H.reset.c=0;S=seed();draft=[];toast('Data contoh dipulihkan')}
+};
+const sync=e=>{const f=e.target.dataset&&e.target.dataset.f;if(f)form[f]=e.target.value};
+document.addEventListener('input',sync);document.addEventListener('change',sync);
+document.addEventListener('click',e=>{
+  if(e.target.classList&&e.target.classList.contains('ov')){$('#mod').innerHTML='';return}
+  const b=e.target.closest('[data-a]');if(!b)return;
+  const f=H[b.dataset.a];if(f&&f(b.dataset.id)!==false){render();save()}
+});
+render();
+})();
+</script></body></html>
